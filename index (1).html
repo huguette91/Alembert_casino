@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="D’Alembert">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#14181f">
+<title>D’Alembert – Roulette</title>
+<style>
+:root{--bg:#f3efe6;--card:#fffdf8;--ink:#1b1d22;--mut:#6b6f78;--line:#ddd6c6;--red:#b3262e;--grn:#1f7a4d;--gold:#a8741a;--blue:#2b4c8c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14181f;--card:#1d222b;--ink:#eee8da;--mut:#9aa0ab;--line:#30363f;--red:#e0555c;--grn:#3fb37f;--gold:#e3b04b;--blue:#7fa0e0}}
+*{box-sizing:inherit}
+html{background:var(--bg);scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 Georgia,"Iowan Old Style","Times New Roman",serif;-webkit-text-size-adjust:100%}
+main{max-width:640px;margin:0 auto;padding:14px 14px 40px}
+h1{font-size:26px;margin:6px 0 2px;letter-spacing:-.01em}
+h2{font-size:18px;margin:0 0 8px}
+.sub{color:var(--mut);font-size:14px;margin:0 0 14px}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:flex;flex-direction:column;font:13px -apple-system,system-ui,sans-serif;color:var(--mut);gap:4px}
+input,select{font:16px -apple-system,system-ui,sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-height:42px}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+.chk{flex-direction:row;align-items:center;gap:8px;color:var(--ink);margin-top:10px}
+.chk input{width:20px;min-height:20px}
+canvas{width:100%;display:block;touch-action:manipulation}
+.sc{overflow-x:auto;-webkit-overflow-scrolling:touch}
+#hist{height:230px}#mcv{height:260px}
+.res{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.res div{background:var(--bg);border-radius:8px;padding:8px 10px;font:13px -apple-system,system-ui,sans-serif;color:var(--mut)}
+.res b{display:block;font:600 20px Georgia,serif;color:var(--ink)}
+.res .hl b{color:var(--gold)}
+table{width:100%;border-collapse:collapse;font:14px -apple-system,system-ui,sans-serif;margin-top:10px}
+td,th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}th{color:var(--mut);font-weight:500}
+button{font:600 16px -apple-system,system-ui,sans-serif;background:var(--ink);color:var(--bg);border:0;border-radius:10px;padding:11px 16px;min-height:44px;margin-top:10px;width:100%}
+.note{font:12px/1.4 -apple-system,system-ui,sans-serif;color:var(--mut);margin:8px 0 0}
+.leg{font:12px -apple-system,system-ui,sans-serif;color:var(--mut);display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+</style>
+</head>
+<body>
+<main>
+<h1>D’Alembert à la roulette</h1>
+<p class="sub">Calcul exact et simulations Monte Carlo. Chance simple, mise +1 après une perte, −1 après un gain.</p>
+
+<section>
+<h2>Paramètres</h2>
+<div class="grid">
+<label>Mise de départ (€)<input id="mise" type="number" inputmode="decimal" value="1" min="0.5"></label>
+<label>Budget max (€), 0 = sans limite<input id="bank" type="number" inputmode="decimal" value="0" min="0"></label>
+<label>Durée (heures)<input id="hrs" type="number" inputmode="decimal" value="2" step="0.25" min="0.25"></label>
+<label>Secondes par tour<input id="rate" type="number" inputmode="decimal" value="100" min="1"></label>
+<label>Roulette<select id="wheel"><option value="eu">Européenne (37)</option><option value="us">Américaine (38)</option></select></label>
+<label>Mise max table (€)<input id="cap" type="number" inputmode="decimal" placeholder="aucune" min="1"></label>
+</div>
+<p class="note" id="info"></p>
+<p class="note">Le budget max est la somme totale que tu acceptes de perdre : si la prochaine mise le dépasse, la séance s’arrête. À 0, cette limite est désactivée.</p>
+</section>
+
+<section>
+<h2>Distribution exacte du résultat</h2>
+<p class="note" style="margin:0 0 6px">1 barre = 1 € de résultat. Fais défiler vers la droite si besoin.</p>
+<div class="sc"><canvas id="hist"></canvas></div>
+<div class="leg"><span><i style="background:var(--red)"></i>perte</span><span><i style="background:var(--grn)"></i>gain</span><span><i style="background:var(--gold)"></i>objectif saisi</span></div>
+<label style="margin-top:12px">Objectif de gain en € (entier)<input id="target" type="number" inputmode="numeric" step="1" value="10"></label>
+<div class="res">
+<div class="hl">Atteindre l’objectif au moins une fois<b id="rHit">–</b></div>
+<div>Finir exactement à l’objectif<b id="rEq">–</b></div>
+<div>Finir à l’objectif ou plus<b id="rGe">–</b></div>
+<div>Finir en gain<b id="rWin">–</b></div>
+<div>Bloqué faute de budget<b id="rRuin">–</b></div>
+<div>Résultat moyen en fin de séance<b id="rMean">–</b></div>
+</div>
+<p class="note" id="rNote"></p>
+<table><thead><tr><th>Objectif</th><th>Atteint au moins une fois</th></tr></thead><tbody id="tbl"></tbody></table>
+<p class="note">Une probabilité élevée d’atteindre un petit objectif est compensée par la perte plus grande quand il n’est pas atteint : l’espérance reste négative.</p>
+</section>
+
+<section>
+<h2>Simulations Monte Carlo</h2>
+<canvas id="mcv"></canvas>
+<div class="leg"><span><i style="background:var(--blue)"></i>200 séances</span><span><i style="background:var(--gold)"></i>médiane et quantiles 10 / 90 %</span></div>
+<label class="chk"><input type="checkbox" id="stop" checked>S’arrêter dès que l’objectif est atteint</label>
+<div class="res">
+<div>Objectif atteint<b id="mHit">–</b></div>
+<div>Bloqué faute de budget<b id="mRuin">–</b></div>
+<div>Médiane en fin de séance<b id="mMed">–</b></div>
+<div>Pire séance<b id="mMin">–</b></div>
+</div>
+<button id="rerun">Relancer les simulations</button>
+</section>
+<p class="note">Hypothèses : gain 1:1, le zéro fait perdre la mise, aucune règle « en prison ». Outil d’analyse : aucune stratégie de mise ne rend la roulette rentable.</p>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const fmt=x=>(x>0?'+':'')+Math.round(x*100)/100+' €';
+const pct=x=>x>=0.9995?'≈100 %':x<0.0005&&x>0?'<0,05 %':(x*100).toFixed(x<0.1?2:1).replace('.',',')+' %';
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function params(){
+  const mise=Math.max(.01,+$('mise').value||1);
+  const bk=+$('bank').value||0,B=bk>0?Math.max(1,Math.floor(bk/mise)):Infinity;
+  const N=Math.max(1,Math.round((+$('hrs').value||1)*3600/Math.max(1,+$('rate').value||100)));
+  const p=$('wheel').value==='eu'?18/37:18/38;
+  const cap=$('cap').value?Math.max(1,Math.floor(+$('cap').value/mise)):1e9;
+  const X=parseInt($('target').value);
+  return{mise,B,N,p,cap,X:isNaN(X)?0:X,t:Math.round((isNaN(X)?0:X)/mise),stop:$('stop').checked};
+}
+
+// Programmation dynamique exacte : état = (gain en unités, niveau de mise)
+function dp(B,N,p,cap,T){
+  const Be=Math.min(B,N*(N+1)/2),off=B-Be,W=Be+N+1,K=N+3;
+  let cur=new Float64Array(W*K),nxt=new Float64Array(W*K);
+  const fin=new Float64Array(W),stuck=new Float64Array(W);let hit=0;
+  cur[Be*K+1]=1;
+  for(let s=0;s<N;s++){
+    nxt.fill(0);
+    for(let i=0;i<W;i++){
+      for(let k=1;k<=s+1;k++){
+        const m=cur[i*K+k];if(!m)continue;
+        const bet=Math.min(k,cap);
+        if(bet>off+i){fin[i]+=m;stuck[i]+=m;continue}
+        const wi=Math.min(W-1,i+bet);
+        if(T!=null&&wi-Be>=T)hit+=m*p;else nxt[wi*K+Math.max(1,k-1)]+=m*p;
+        nxt[Math.max(0,i-bet)*K+k+1]+=m*(1-p);
+      }
+    }
+    [cur,nxt]=[nxt,cur];
+  }
+  for(let i=0;i<W;i++)for(let k=1;k<K;k++)fin[i]+=cur[i*K+k];
+  return{fin,stuck,Be,W,hit};
+}
+
+function setup(c){
+  const r=window.devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;
+  c.width=w*r;c.height=h*r;const x=c.getContext('2d');x.setTransform(r,0,0,r,0,0);x.clearRect(0,0,w,h);
+  return{x,w,h};
+}
+
+function drawHist(d,P){
+  const c=$('hist'),wrap=c.parentNode,L=34,R=6,T=8,Bt=22,bp=7;
+  const{fin,Be,W}=d;
+  let lo=0,hi=W-1;
+  while(lo<W-1&&fin[lo]<1e-5)lo++;while(hi>0&&fin[hi]<1e-5)hi--;
+  const ti=Math.min(W-1,Math.max(0,P.t+Be));
+  lo=Math.min(lo,Be,ti);hi=Math.max(hi,Be,ti);
+  const nb=hi-lo+1,bwid=Math.max(bp,(wrap.clientWidth-L-R)/nb);
+  c.style.width=Math.ceil(L+R+nb*bwid)+'px';
+  const{x,w,h}=setup(c);
+  let mx=0;for(let i=lo;i<=hi;i++)mx=Math.max(mx,fin[i]);mx*=1.08;
+  const ph=h-T-Bt;
+  x.font='11px -apple-system,sans-serif';x.fillStyle=css('--mut');x.strokeStyle=css('--line');
+  for(let g=0;g<=3;g++){const y=T+ph-ph*g/3;x.beginPath();x.moveTo(L,y);x.lineTo(w-R,y);x.stroke();x.textAlign='right';x.fillText((mx*g/3*100).toFixed(mx<.1?1:0)+'%',L-4,y+4)}
+  const step=Math.ceil(36/bwid);
+  for(let b=0;b<nb;b++){
+    const i=lo+b,prof=i-Be;
+    x.fillStyle=i===ti?css('--gold'):prof<0?css('--red'):css('--grn');
+    const bh=fin[i]/mx*ph;x.fillRect(L+b*bwid+.5,T+ph-bh,bwid-1,bh);
+    if(b%step===0){x.fillStyle=css('--mut');x.textAlign='center';x.fillText(Math.round(prof*P.mise*100)/100,L+(b+.5)*bwid,h-6)}
+  }
+}
+
+function updateExact(){
+  const P=params();
+  $('info').textContent=P.N+' tours · '+(P.B===Infinity?'budget illimité':P.B+' unités de budget')+' · probabilité de gain par tour '+(P.p*100).toFixed(2).replace('.',',')+' %';
+  const d=dp(P.B,P.N,P.p,P.cap,null),{fin,Be,W,stuck}=d;
+  let mean=0,win=0,ge=0,eq=0,ru=0;
+  for(let i=0;i<W;i++){const pr=i-Be;mean+=fin[i]*pr;if(pr>0)win+=fin[i];if(pr>=P.t)ge+=fin[i];if(pr===P.t)eq=fin[i];ru+=stuck[i]}
+  const hit=P.t<=0?1:dp(P.B,P.N,P.p,P.cap,P.t).hit;
+  $('rHit').textContent=pct(hit);$('rEq').textContent=pct(eq);$('rGe').textContent=pct(ge);
+  $('rWin').textContent=pct(win);$('rRuin').textContent=pct(ru);$('rMean').textContent=fmt(mean*P.mise);
+  $('rNote').textContent=(P.t*P.mise!==P.X?'Objectif arrondi au multiple de la mise : '+fmt(P.t*P.mise)+'. ':'')+(P.t<=0?'Objectif nul ou négatif : déjà atteint au départ.':'');
+  const rows=[2,5,10,20,40].map(u=>[u,dp(P.B,P.N,P.p,P.cap,u).hit]);
+  $('tbl').innerHTML=rows.map(r=>'<tr><td>'+fmt(r[0]*P.mise)+'</td><td>'+pct(r[1])+'</td></tr>').join('');
+  drawHist(d,P);
+}
+
+function runMC(){
+  const P=params(),M=200,N=P.N,paths=[];let hits=0,ru=0;
+  for(let m=0;m<M;m++){
+    const a=new Float32Array(N+1);let pr=0,k=1,done=false,reached=false;
+    for(let s=0;s<N;s++){
+      if(!done){
+        const bet=Math.min(k,P.cap);
+        if(bet>P.B+pr){done=true;ru++}
+        else{
+          if(Math.random()<P.p){pr+=bet;k=Math.max(1,k-1)}else{pr-=bet;k++}
+          if(P.t>0&&pr>=P.t){if(!reached){reached=true;hits++}if(P.stop)done=true}
+        }
+      }
+      a[s+1]=pr*P.mise;
+    }
+    paths.push(a);
+  }
+  const q=[.1,.5,.9].map(()=>new Float32Array(N+1)),col=new Float32Array(M);
+  for(let s=0;s<=N;s++){for(let m=0;m<M;m++)col[m]=paths[m][s];const o=Float32Array.from(col).sort();q[0][s]=o[Math.floor(M*.1)];q[1][s]=o[M>>1];q[2][s]=o[Math.floor(M*.9)]}
+  const{x,w,h}=setup($('mcv'));
+  let mn=0,mx=0;for(const a of paths)for(const v of a){if(v<mn)mn=v;if(v>mx)mx=v}
+  mx=Math.max(mx,P.t*P.mise)*1.05;mn*=1.05;if(mx===mn)mx=mn+1;
+  const L=44,R=6,T=8,Bt=22,pw=w-L-R,ph=h-T-Bt,X=s=>L+pw*s/N,Y=v=>T+ph*(1-(v-mn)/(mx-mn));
+  x.font='11px -apple-system,sans-serif';x.fillStyle=css('--mut');x.strokeStyle=css('--line');x.textAlign='right';
+  for(let g=0;g<=4;g++){const v=mn+(mx-mn)*g/4,y=Y(v);x.beginPath();x.moveTo(L,y);x.lineTo(w-R,y);x.stroke();x.fillText(Math.round(v)+'€',L-4,y+4)}
+  x.textAlign='center';for(let g=0;g<=4;g++)x.fillText(Math.round(N*g/4),X(N*g/4),h-6);
+  x.strokeStyle=css('--blue');x.globalAlpha=.16;x.lineWidth=1;
+  for(const a of paths){x.beginPath();for(let s=0;s<=N;s++)s?x.lineTo(X(s),Y(a[s])):x.moveTo(X(s),Y(a[s]));x.stroke()}
+  x.globalAlpha=1;x.strokeStyle=css('--ink');x.setLineDash([4,4]);x.beginPath();x.moveTo(L,Y(0));x.lineTo(w-R,Y(0));x.stroke();
+  if(P.t>0){x.strokeStyle=css('--gold');x.beginPath();x.moveTo(L,Y(P.t*P.mise));x.lineTo(w-R,Y(P.t*P.mise));x.stroke()}
+  x.setLineDash([]);x.strokeStyle=css('--gold');
+  q.forEach((a,i)=>{x.lineWidth=i===1?2.5:1.5;x.globalAlpha=i===1?1:.7;x.beginPath();for(let s=0;s<=N;s++)s?x.lineTo(X(s),Y(a[s])):x.moveTo(X(s),Y(a[s]));x.stroke()});
+  x.globalAlpha=1;
+  const fins=paths.map(a=>a[N]).sort((a,b)=>a-b);
+  $('mHit').textContent=pct(hits/M);$('mRuin').textContent=pct(ru/M);
+  $('mMed').textContent=fmt(fins[M>>1]);$('mMin').textContent=fmt(fins[0]);
+}
+
+function save(){try{localStorage.setItem('dal3',JSON.stringify(['mise','bank','hrs','rate','wheel','cap','target'].map(i=>$(i).value)))}catch(e){}}
+function load(){try{const v=JSON.parse(localStorage.getItem('dal3')||'null');if(v)['mise','bank','hrs','rate','wheel','cap','target'].forEach((i,j)=>$(i).value=v[j])}catch(e){}}
+
+let tm;
+function refresh(){clearTimeout(tm);tm=setTimeout(()=>{save();updateExact();runMC()},250)}
+['mise','bank','hrs','rate','wheel','cap','target','stop'].forEach(i=>$(i).addEventListener('input',refresh));
+$('rerun').addEventListener('click',runMC);
+window.addEventListener('resize',()=>{updateExact();runMC()});
+load();updateExact();runMC();
+</script>
+</body>
+</html>
